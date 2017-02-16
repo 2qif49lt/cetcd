@@ -30,13 +30,20 @@
 
 #ifndef __SDS_H
 #define __SDS_H
-
+#ifdef __cplusplus
+extern "C" {
+#endif
 #define SDS_MAX_PREALLOC (1024*1024)
 
+#ifdef _WIN32
+#pragma warning(disable:4200)
+#endif
 #include <sys/types.h>
 #include <stdarg.h>
 
 typedef char *sds;
+
+#define inline __inline
 
 struct sdshdr {
     int len;
@@ -97,5 +104,9 @@ sds sdsMakeRoomFor(sds s, size_t addlen);
 void sdsIncrLen(sds s, int incr);
 sds sdsRemoveFreeSpace(sds s);
 size_t sdsAllocSize(sds s);
+
+#ifdef __cplusplus
+ } // extern "C"
+#endif
 
 #endif

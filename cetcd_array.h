@@ -1,5 +1,10 @@
 #ifndef CETCD_ARRAY_H
 #define CETCD_ARRAY_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdlib.h>
 
 typedef struct cetcd_array_t {
@@ -24,5 +29,9 @@ void *cetcd_array_top(cetcd_array *ca);
 void *cetcd_array_pop(cetcd_array *ca);
 
 cetcd_array *cetcd_array_shuffle(cetcd_array *cards);
+
+#ifdef __cplusplus
+} // extern "C"
+#endif
 
 #endif

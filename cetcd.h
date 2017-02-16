@@ -5,14 +5,21 @@
 extern "C" {
 #endif
 
-#include <curl/curl.h>
+#ifdef _WIN32
+#include <Winsock2.h>
+#include <windows.h>
+typedef  HANDLE cetcd_watch_id;
+#else
 #include <pthread.h>
+typedef pthread_t cetcd_watch_id;
+#endif
+
+
 #include <stdint.h>
 #include "sds/sds.h"
 #include "cetcd_array.h"
 #define CETCD_VERSION release-v0.0.5
 typedef sds cetcd_string;
-typedef pthread_t cetcd_watch_id;
 
 enum HTTP_METHOD {
     ETCD_HTTP_GET,
@@ -39,14 +46,16 @@ enum ETCD_EVENT_ACTION {
 #define error_response_parsed_failed 1000
 #define error_send_request_failed    1001
 #define error_cluster_failed         1002
+
 typedef struct cetcd_error_t {
     int ecode;
     char *message;
     char *cause;
     uint64_t index;
 }cetcd_error;
+
 typedef struct cetcd_client_t {
-    CURL  *curl;
+    void  *curl;
     cetcd_error *err;
     cetcd_array watchers; /*curl watch handlers*/
     cetcd_array *addresses;/*cluster addresses*/
@@ -88,16 +97,14 @@ typedef struct cetcd_reponse_t {
     uint64_t raft_term;
 } cetcd_response;
 
-struct cetcd_response_parser_t ;
-
 typedef int (*cetcd_watcher_callback) (void *userdata, cetcd_response *resp);
 typedef struct cetcd_watcher_t {
     cetcd_client *cli;
-    struct cetcd_response_parser_t *parser;
+	void* parser; //   struct cetcd_response_parser_t *parser;
     int attempts;
     int array_index; /*the index in array cli->wachers*/
 
-    CURL         *curl;
+    void         *curl;
     int          once;
     int          recursive;
     uint64_t     index;

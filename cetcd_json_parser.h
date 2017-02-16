@@ -2,7 +2,10 @@
 #include <string.h>
 #include <stdlib.h>
 #include "cetcd.h"
-
+#include "sds/sds.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 typedef struct yajl_parser_context_t {
     void *userdata;
     cetcd_array keystack;   
@@ -38,25 +41,25 @@ static int cetcd_parse_action(cetcd_string act) {
     return -1;
 }
 static int yajl_parse_bool_cb(void *ctx, int val) {
-    yajl_parser_context *c = ctx;
+    yajl_parser_context *c = (yajl_parser_context *)ctx;
     cetcd_response_node *node;
     cetcd_string key;
 
-    key = cetcd_array_pop(&c->keystack);
+    key =(cetcd_string) cetcd_array_pop(&c->keystack);
     if (EQ(key, "dir")) {
-        node = cetcd_array_top(&c->nodestack);
+        node =(cetcd_response_node *) cetcd_array_top(&c->nodestack);
         node->dir = val;
     }
     sdsfree(key);
     return 1;
 }
 static int yajl_parse_integer_cb(void *ctx, long long val) {
-    yajl_parser_context *c = ctx;
+    yajl_parser_context *c =( yajl_parser_context *) ctx;
     cetcd_response_node *node;
     cetcd_string key;
 
-    key = cetcd_array_pop(&c->keystack);
-    node = cetcd_array_top(&c->nodestack);
+    key = (cetcd_string)cetcd_array_pop(&c->keystack);
+    node = ( cetcd_response_node *)cetcd_array_top(&c->nodestack);
     if (EQ(key, "ttl")) {
         node->ttl = (int64_t)val;
     }
@@ -74,22 +77,22 @@ static int yajl_parse_integer_cb(void *ctx, long long val) {
     return 1;
 }
 static int yajl_parse_string_cb(void *ctx, unsigned const char *val, size_t len) {
-    yajl_parser_context *c = ctx;
+    yajl_parser_context *c = (yajl_parser_context *)ctx;
     cetcd_response_node *node;
     cetcd_response *resp;
     cetcd_string key, value;
 
-    key = cetcd_array_pop(&c->keystack);
+    key = (cetcd_string)cetcd_array_pop(&c->keystack);
     if (EQ(key, "key")) {
-        node = cetcd_array_top(&c->nodestack);
+        node = (cetcd_response_node *)cetcd_array_top(&c->nodestack);
         node->key = sdsnewlen(val, len);
     }
     else if (EQ(key, "value")) {
-        node = cetcd_array_top(&c->nodestack);
+        node =(cetcd_response_node *) cetcd_array_top(&c->nodestack);
         node->value = sdsnewlen(val, len);
     }
     else if (EQ(key, "action")) {
-        resp = c->userdata;
+        resp = (cetcd_response *)c->userdata;
         value = sdsnewlen(val, len);
         resp->action = cetcd_parse_action(value);
         sdsfree(value);
@@ -98,16 +101,16 @@ static int yajl_parse_string_cb(void *ctx, unsigned const char *val, size_t len)
     return 1;
 }
 static int yajl_parse_start_map_cb(void *ctx) {
-    yajl_parser_context *c = ctx;
+    yajl_parser_context *c =(yajl_parser_context*) ctx;
     cetcd_string key;
     cetcd_response_node *node, *child;
 
     /*this is key of nodes*/
     if (cetcd_array_size(&c->keystack) > 0) {
-        key = cetcd_array_top(&c->keystack);
-        node = cetcd_array_top(&c->nodestack);
+        key = (cetcd_string)cetcd_array_top(&c->keystack);
+        node =(cetcd_response_node*) cetcd_array_top(&c->nodestack);
         if (EQ(key, "nodes")) {
-            child = calloc(1, sizeof(cetcd_response_node));
+            child = (cetcd_response_node*)calloc(1, sizeof(cetcd_response_node));
             cetcd_array_append(node->nodes, child);
             cetcd_array_append(&c->nodestack, child);
             cetcd_array_append(&c->keystack, sdsnew("noname"));
@@ -122,7 +125,7 @@ static int yajl_parse_start_map_cb(void *ctx) {
     return 1;
 }
 static int yajl_parse_map_key_cb(void *ctx, const unsigned char *key, size_t len) {
-    yajl_parser_context *c = ctx;
+    yajl_parser_context *c = (yajl_parser_context *)ctx;
     cetcd_response *resp = (cetcd_response *)c->userdata;
 
     cetcd_string name = sdsnewlen(key, len);
@@ -130,30 +133,31 @@ static int yajl_parse_map_key_cb(void *ctx, const unsigned char *key, size_t len
     cetcd_array_append(&c->keystack, name);
 
     if (EQ(name, "node")) {
-        resp->node = calloc(1, sizeof(cetcd_response_node));
+        resp->node = (cetcd_response_node_t *)calloc(1, sizeof(cetcd_response_node));
         cetcd_array_append(&c->nodestack, resp->node);
     }
     else if (EQ(name, "prevnode")) {
-        resp->prev_node = calloc(1, sizeof(cetcd_response_node));
+        resp->prev_node = (cetcd_response_node_t *)calloc(1, sizeof(cetcd_response_node));
         cetcd_array_append(&c->nodestack, resp->prev_node);
     }
     return 1;
 }
 static int yajl_parse_end_map_cb(void *ctx) {
-    yajl_parser_context *c = ctx;
-    cetcd_string key = cetcd_array_pop(&c->keystack);
+    yajl_parser_context *c = (yajl_parser_context *)ctx;
+    cetcd_string key = (cetcd_string)cetcd_array_pop(&c->keystack);
     if (key) {
         sdsfree(key);
     }
     cetcd_array_pop(&c->nodestack);
     return 1;
 }
+
 static int yajl_parse_start_array_cb(void *ctx) {
-    yajl_parser_context *c = ctx;
+    yajl_parser_context *c =(yajl_parser_context *) ctx;
     cetcd_response_node *node;
     cetcd_string key;
 
-    key = cetcd_array_top(&c->keystack);
+    key = (cetcd_string)cetcd_array_top(&c->keystack);
     node = (cetcd_response_node *)cetcd_array_top(&c->nodestack);
     if (EQ(key, "nodes")) {
         if (node) {
@@ -163,19 +167,19 @@ static int yajl_parse_start_array_cb(void *ctx) {
     return 1;
 }
 static int yajl_parse_end_array_cb(void *ctx) {
-    yajl_parser_context *c = ctx;
+    yajl_parser_context *c = (yajl_parser_context *)ctx;
     cetcd_string key;
 
     key = (cetcd_string)cetcd_array_top(&c->keystack);
     if (EQ(key, "nodes")) {
-        sdsfree(cetcd_array_pop(&c->keystack));
+        sdsfree((sds)cetcd_array_pop(&c->keystack));
     }
     return 1;
 }
 
 static int yajl_parse_null_ignore_cb(void *ctx) {
-    yajl_parser_context *c = ctx;
-    sdsfree(cetcd_array_pop(&c->keystack));
+    yajl_parser_context *c = (yajl_parser_context *)ctx;
+    sdsfree((sds)cetcd_array_pop(&c->keystack));
     /*just ignore*/
     return 1;
 }
@@ -207,9 +211,9 @@ static yajl_callbacks callbacks = {
  * a nodestack.
  * */
 static int yajl_err_parse_integer_cb(void *ctx, long long val) {
-    yajl_parser_context *c = ctx;
-    cetcd_error *err = c->userdata;
-    cetcd_string key = cetcd_array_pop(&c->keystack);
+    yajl_parser_context *c =(yajl_parser_context *) ctx;
+    cetcd_error *err = (cetcd_error*)c->userdata;
+    cetcd_string key = (cetcd_string)cetcd_array_pop(&c->keystack);
     if (EQ(key, "errorcode")) {
         err->ecode = (int)val;
     }
@@ -217,9 +221,9 @@ static int yajl_err_parse_integer_cb(void *ctx, long long val) {
     return 1;
 }
 static int yajl_err_parse_string_cb(void *ctx, unsigned const char *val, size_t len) {
-    yajl_parser_context *c = ctx;
-    cetcd_error *err = c->userdata;
-    cetcd_string key = cetcd_array_pop(&c->keystack);
+    yajl_parser_context *c = (yajl_parser_context *)ctx;
+    cetcd_error *err =(cetcd_error*) c->userdata;
+    cetcd_string key =(cetcd_string) cetcd_array_pop(&c->keystack);
     if (EQ(key, "message")) {
         err->message = sdsnewlen(val, len);
     }
@@ -231,14 +235,14 @@ static int yajl_err_parse_string_cb(void *ctx, unsigned const char *val, size_t 
     return 1;
 }
 static int yajl_err_parse_start_map_cb(void *ctx) {
-    yajl_parser_context *c = ctx;
+    yajl_parser_context *c = ( yajl_parser_context *)ctx;
     if (c->userdata == NULL) {
         c->userdata = calloc(1, sizeof(cetcd_error));
     }
     return 1;
 }
 static int yajl_err_parse_map_key_cb(void *ctx, unsigned const char *key, size_t len) {
-    yajl_parser_context *c = ctx;
+    yajl_parser_context *c = ( yajl_parser_context *)ctx;
     cetcd_string name = sdsnewlen(key, len);
     sdstolower(name);
     cetcd_array_append(&c->keystack, name);
@@ -264,23 +268,23 @@ static yajl_callbacks error_callbacks = {
 };
 
 static int yajl_sync_parse_string_cb(void *ctx, unsigned const char *val, size_t len) {
-    yajl_parser_context *c = ctx;
-    cetcd_array *array = c->userdata;
-    cetcd_string key = cetcd_array_top(&c->keystack);
+    yajl_parser_context *c =( yajl_parser_context *) ctx;
+    cetcd_array *array =(cetcd_array *) c->userdata;
+    cetcd_string key =(cetcd_string) cetcd_array_top(&c->keystack);
     if ( key  && EQ(key, "clientURLs")) {
         cetcd_array_append(array, sdsnewlen(val, len));
     }
     return 1;
 }
 static int yajl_sync_parse_start_map_cb(void *ctx) {
-    yajl_parser_context *c = ctx;
+    yajl_parser_context *c = ( yajl_parser_context *)ctx;
     if (c->userdata == NULL) {
         c->userdata = cetcd_array_create(10);
     }
     return 1;
 }
 static int yajl_sync_parse_map_key_cb(void *ctx, const unsigned char *key, size_t len) {
-    yajl_parser_context *c = ctx;
+    yajl_parser_context *c = ( yajl_parser_context *)ctx;
     cetcd_string name = sdsnewlen(key, len);
     if (EQ(name, "clientURLs")) {
         cetcd_array_append(&c->keystack, name);
@@ -290,19 +294,19 @@ static int yajl_sync_parse_map_key_cb(void *ctx, const unsigned char *key, size_
     return 1;
 }
 static int yajl_sync_parse_end_map_cb(void *ctx) {
-    yajl_parser_context *c = ctx;
-    cetcd_string key = cetcd_array_pop(&c->keystack);
+    yajl_parser_context *c = ( yajl_parser_context *)ctx;
+    cetcd_string key = (cetcd_string)cetcd_array_pop(&c->keystack);
     if (key) {
         sdsfree(key);
     }
     return 1;
 }
 static int yajl_sync_parse_end_array_cb(void *ctx) {
-    yajl_parser_context *c = ctx;
+    yajl_parser_context *c = ( yajl_parser_context *)ctx;
     cetcd_string key;
-    key = cetcd_array_top(&c->keystack);
+    key =(cetcd_string) cetcd_array_top(&c->keystack);
     if (key && EQ(key, "clientURLs")) {
-        sdsfree(cetcd_array_pop(&c->keystack));
+        sdsfree((sds)cetcd_array_pop(&c->keystack));
     }
     return 1;
 }
@@ -320,3 +324,7 @@ static yajl_callbacks sync_callbacks = {
     NULL, //start array
     yajl_sync_parse_end_array_cb //end array
 };
+
+#ifdef __cplusplus
+} // extern "C"
+#endif
